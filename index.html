@@ -10,13 +10,18 @@
     #grid { display: flex; justify-content: center; gap: 8px; margin-top: 20px; }
     .column {
       width: 60px;
-      height: 240px;
+      height: 240px; /* 6 tiles * 40px/tile = 240px */
       background: #e9ecef;
       display: flex;
-      flex-direction: column-reverse;
+      flex-direction: column-reverse; /* 블록이 아래에서 위로 쌓이도록 */
       justify-content: start;
       padding: 4px;
       border-radius: 4px;
+      transition: background-color 0.2s ease; /* 호버 효과를 부드럽게 */
+    }
+    .column:hover {
+      background-color: #dee2e6; /* 호버 시 색상 변경 */
+      cursor: pointer;
     }
     .tile {
       width: 100%;
@@ -24,13 +29,31 @@
       background-color: #ffffff;
       margin-bottom: 4px;
       font-weight: bold;
-      line-height: 40px;
+      line-height: 40px; /* 텍스트를 수직 중앙 정렬 */
       border-radius: 4px;
       box-shadow: 0 0 3px rgba(0,0,0,0.1);
+      color: #333; /* 텍스트 색상 */
+      display: flex; /* Flexbox를 사용하여 내용 중앙 정렬 */
+      align-items: center;
+      justify-content: center;
     }
+    /* 숫자에 따라 블록 색상 변경 */
+    .tile[data-num="1"] { background-color: #a8dadc; }
+    .tile[data-num="2"] { background-color: #fca3b7; }
+    .tile[data-num="3"] { background-color: #c9e2b1; }
+    .tile[data-num="4"] { background-color: #ffda79; }
+    .tile[data-num="5"] { background-color: #d1b8ff; }
+
     #next {
       font-size: 24px;
       margin-top: 10px;
+      font-weight: bold;
+    }
+    #nextNum {
+      color: #007bff; /* 다음 블록 숫자 색상 */
+    }
+    #status {
+      min-height: 24px; /* 메시지가 없을 때 공간 확보 */
     }
   </style>
 </head>
@@ -42,61 +65,87 @@
   <p id="status" class="mt-4 fw-bold"></p>
 
   <script>
-    const cols = 5;
-    const colHeight = 6;
+    const cols = 5; // 열의 개수
+    const colHeight = 6; // 각 열의 최대 높이 (블록 개수)
+    const maxNumber = 5; // 블록에 나타날 수 있는 최대 숫자 (1부터 maxNumber까지)
+
     const gridEl = document.getElementById("grid");
     const nextEl = document.getElementById("nextNum");
     const statusEl = document.getElementById("status");
 
-    let nextNumber = 1 + Math.floor(Math.random() * 3);
-    const stacks = Array.from({ length: cols }, () => []);
+    let nextNumber = 1 + Math.floor(Math.random() * maxNumber); // 다음으로 나올 블록 숫자
+    const stacks = Array.from({ length: cols }, () => []); // 각 열의 스택을 저장할 배열
 
+    // 게임 초기화: 스택에 무작위 블록 채우기
+    function initializeStacks() {
+      for (let i = 0; i < cols; i++) {
+        // 각 열에 0개, 1개, 또는 2개의 초기 블록을 무작위로 추가
+        const initialBlocks = Math.floor(Math.random() * 3);
+        for (let j = 0; j < initialBlocks; j++) {
+          stacks[i].push(1 + Math.floor(Math.random() * maxNumber)); // 1부터 maxNumber까지의 숫자
+        }
+      }
+    }
+
+    // 그리드를 화면에 그리는 함수
     function renderGrid() {
-      gridEl.innerHTML = "";
+      gridEl.innerHTML = ""; // 기존 그리드 내용을 지우고 새로 그립니다.
       for (let i = 0; i < cols; i++) {
         const colEl = document.createElement("div");
         colEl.className = "column";
         colEl.dataset.index = i;
-        colEl.addEventListener("click", () => placeTile(i));
+        colEl.addEventListener("click", () => placeTile(i)); // 클릭 이벤트 리스너 추가
+
+        // 현재 스택에 있는 블록들을 그립니다.
         stacks[i].forEach(n => {
           const tile = document.createElement("div");
           tile.className = "tile";
           tile.textContent = n;
+          tile.dataset.num = n; // CSS 스타일링을 위해 data-num 속성 추가
           colEl.appendChild(tile);
         });
         gridEl.appendChild(colEl);
       }
     }
 
+    // 다음 블록 숫자를 업데이트하는 함수
     function updateNext() {
-      nextNumber = 1 + Math.floor(Math.random() * 3);
+      nextNumber = 1 + Math.floor(Math.random() * maxNumber); // 1부터 maxNumber까지의 숫자
       nextEl.textContent = nextNumber;
     }
 
+    // 블록을 배치하는 함수
     function placeTile(index) {
+      statusEl.textContent = ""; // 메시지 초기화
+
       if (stacks[index].length >= colHeight) {
-        statusEl.textContent = "❌ 게임 오버 - 너무 많이 쌓였어요!";
-        return;
+        statusEl.textContent = "❌ 게임 오버 - 너무 많이 쌓였어요! 다른 칸을 선택해주세요.";
+        return; // 칸이 가득 찼으면 블록을 놓지 않고 종료
       }
-      stacks[index].push(nextNumber);
-      checkClear(index);
-      updateNext();
-      renderGrid();
+      stacks[index].push(nextNumber); // 현재 블록을 스택에 추가
+      
+      checkClear(index); // 블록 추가 후 3개 연속 매치 확인
+      updateNext(); // 다음 블록 업데이트
+      renderGrid(); // 그리드 다시 그리기
     }
 
+    // 블록 3개 연속 매치를 확인하고 제거하는 함수
     function checkClear(colIndex) {
       const stack = stacks[colIndex];
+      // 스택의 길이가 최소 3개 이상이어야 확인 가능
       if (stack.length >= 3) {
+        // 스택의 가장 위쪽 3개 블록을 가져옵니다.
         const top3 = stack.slice(-3);
+        // 세 블록의 숫자가 모두 같은지 확인합니다.
         if (top3[0] === top3[1] && top3[1] === top3[2]) {
-          stack.splice(-3, 3);
+          stack.splice(-3, 3); // 같은 숫자 3개를 스택에서 제거합니다.
           statusEl.textContent = "✅ 블록 3개 제거!";
-        } else {
-          statusEl.textContent = "";
         }
       }
     }
 
+    // 게임 시작 시 초기화 및 렌더링
+    initializeStacks();
     renderGrid();
     updateNext();
   </script>
